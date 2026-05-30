@@ -1,0 +1,39 @@
+import Navbar from '@/components/feature/Navbar';
+import Footer from '@/components/feature/Footer';
+import FloatingActions from '@/components/feature/FloatingActions';
+import HeroSection from './components/HeroSection';
+import OffersSection from './components/OffersSection';
+import CollectionsSection from './components/CollectionsSection';
+import TrendingLocations from './components/TrendingLocations';
+import TrendingSection from './components/TrendingSection';
+import ExperiencesSection from './components/ExperiencesSection';
+import HowItWorks from './components/HowItWorks';
+import WhyTriprodeo from './components/WhyTriprodeo';
+import ReviewsSection from './components/ReviewsSection';
+import NewsletterSection from './components/NewsletterSection';
+import PressReleasesSection from './components/PressReleasesSection';
+
+export default function HomePage() {
+  return (
+    <div className="min-h-screen bg-white">
+      <Navbar />
+      <HeroSection />
+      {/* Offers section – live host promotions, right below the banner */}
+      <OffersSection />
+      <CollectionsSection />
+      {/* Trending Locations */}
+      <TrendingLocations />
+      {/* Trending Properties */}
+      <TrendingSection />
+      <ExperiencesSection />
+      <HowItWorks />
+      {/* Why Triprodeo – above reviews */}
+      <WhyTriprodeo />
+      <ReviewsSection />
+      <PressReleasesSection />
+      <NewsletterSection />
+      <FloatingActions />
+      <Footer />
+    </div>
+  );
+}

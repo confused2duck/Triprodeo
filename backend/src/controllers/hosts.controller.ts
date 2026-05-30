@@ -1,0 +1,205 @@
+import { Request, Response, NextFunction } from 'express';
+import * as hostsService from '../services/hosts.service';
+import * as propertiesService from '../services/properties.service';
+import * as bookingsService from '../services/bookings.service';
+import { sendSuccess, sendError } from '../utils/response.util';
+import { Prisma } from '@prisma/client';
+
+const getHostScopeId = (req: Request) => req.user?.hostId ?? req.user!.id;
+
+// Profile
+export const getProfile = async (req: Request, res: Response, next: NextFunction) => {
+  try { sendSuccess(res, await hostsService.getHostProfile(req.user!.id)); }
+  catch (err) { next(err); }
+};
+
+export const updateProfile = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { name, phone, avatar } = req.body;
+    sendSuccess(res, await hostsService.updateHostProfile(req.user!.id, { name, phone, avatar }));
+  } catch (err) { next(err); }
+};
+
+export const updatePassword = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    if (!currentPassword || !newPassword) return sendError(res, 'Passwords required', 400);
+    if (newPassword.length < 8) return sendError(res, 'New password must be at least 8 characters', 400);
+    await hostsService.updateHostPassword(req.user!.id, currentPassword, newPassword);
+    sendSuccess(res, null, 200, 'Password updated');
+  } catch (err) { next(err); }
+};
+
+export const updateBankDetails = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    sendSuccess(res, await hostsService.updateBankDetails(req.user!.id, req.body));
+  } catch (err) { next(err); }
+};
+
+// Dashboard
+export const getDashboard = async (req: Request, res: Response, next: NextFunction) => {
+  try { sendSuccess(res, await hostsService.getHostDashboardStats(getHostScopeId(req))); }
+  catch (err) { next(err); }
+};
+
+// Properties
+export const listProperties = async (req: Request, res: Response, next: NextFunction) => {
+  try { sendSuccess(res, await hostsService.getHostProperties(getHostScopeId(req))); }
+  catch (err) { next(err); }
+};
+
+export const createProperty = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const property = await propertiesService.createProperty(getHostScopeId(req), req.body as Prisma.PropertyCreateInput);
+    sendSuccess(res, property, 201, 'Property created');
+  } catch (err) { next(err); }
+};
+
+export const updateProperty = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const property = await propertiesService.updateProperty(req.params.propertyId, getHostScopeId(req), req.body);
+    sendSuccess(res, property);
+  } catch (err) { next(err); }
+};
+
+export const deleteProperty = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await propertiesService.deleteProperty(req.params.propertyId, getHostScopeId(req));
+    sendSuccess(res, null, 200, 'Property deactivated');
+  } catch (err) { next(err); }
+};
+
+// Bookings
+export const listBookings = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { status, page, limit } = req.query;
+    const result = await bookingsService.getHostBookings(
+      getHostScopeId(req),
+      status as 'CONFIRMED' | undefined,
+      page ? parseInt(page as string) : 1,
+      limit ? parseInt(limit as string) : 20
+    );
+    sendSuccess(res, result);
+  } catch (err) { next(err); }
+};
+
+export const createWalkInBooking = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const {
+      propertyId,
+      roomId,
+      guestName,
+      guestEmail,
+      guestPhone,
+      guestCount,
+      guests,
+      roomsRequired,
+      checkIn,
+      checkOut,
+      paymentMethod,
+      notes,
+    } = req.body;
+
+    if ((!roomId && !propertyId) || !guestName || !guestEmail || !guestPhone || !checkIn || !checkOut) {
+      return sendError(res, 'Missing required booking fields', 400);
+    }
+
+    const booking = await bookingsService.createBooking({
+      propertyId,
+      roomId,
+      guestName,
+      guestEmail,
+      guestPhone,
+      guestCount: guestCount ? parseInt(guestCount) : undefined,
+      guests: guests ? parseInt(guests) : undefined,
+      roomsRequired: roomsRequired ? parseInt(roomsRequired) : undefined,
+      checkIn,
+      checkOut,
+      source: 'WALKIN',
+      paymentMethod,
+      notes,
+      hostId: getHostScopeId(req),
+    });
+
+    sendSuccess(res, booking, 201, 'Walk-in booking created');
+  } catch (err) { next(err); }
+};
+
+export const updateBookingStatus = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { status } = req.body;
+    if (!status) return sendError(res, 'Status required', 400);
+    const booking = await bookingsService.updateBookingStatus(req.params.bookingId, status, getHostScopeId(req));
+    sendSuccess(res, booking);
+  } catch (err) { next(err); }
+};
+
+// Reviews
+export const listReviews = async (req: Request, res: Response, next: NextFunction) => {
+  try { sendSuccess(res, await hostsService.getHostReviews(getHostScopeId(req))); }
+  catch (err) { next(err); }
+};
+
+export const replyToReview = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { reply } = req.body;
+    if (!reply) return sendError(res, 'Reply required', 400);
+    const review = await hostsService.replyToReview(getHostScopeId(req), req.params.reviewId, reply);
+    sendSuccess(res, review);
+  } catch (err) { next(err); }
+};
+
+// Notifications
+export const listNotifications = async (req: Request, res: Response, next: NextFunction) => {
+  try { sendSuccess(res, await hostsService.getHostNotifications(getHostScopeId(req))); }
+  catch (err) { next(err); }
+};
+
+export const markNotificationRead = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await hostsService.markNotificationRead(getHostScopeId(req), req.params.notificationId);
+    sendSuccess(res, null, 200, 'Marked as read');
+  } catch (err) { next(err); }
+};
+
+// Messages
+export const listMessages = async (req: Request, res: Response, next: NextFunction) => {
+  try { sendSuccess(res, await hostsService.getHostMessages(getHostScopeId(req))); }
+  catch (err) { next(err); }
+};
+
+export const sendMessage = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { bookingId, guestName, guestEmail, content } = req.body;
+    if (!bookingId || !content) return sendError(res, 'bookingId and content required', 400);
+    const msg = await hostsService.sendMessage({
+      bookingId, hostId: getHostScopeId(req), guestName, guestEmail, sender: 'host', content,
+    });
+    sendSuccess(res, msg, 201);
+  } catch (err) { next(err); }
+};
+
+// Payouts
+export const listPayouts = async (req: Request, res: Response, next: NextFunction) => {
+  try { sendSuccess(res, await hostsService.getHostPayouts(getHostScopeId(req))); }
+  catch (err) { next(err); }
+};
+
+// Analytics
+export const getAnalytics = async (req: Request, res: Response, next: NextFunction) => {
+  try { sendSuccess(res, await hostsService.getHostAnalytics(getHostScopeId(req))); }
+  catch (err) { next(err); }
+};
+
+// Promotions
+export const listPromotions = async (req: Request, res: Response, next: NextFunction) => {
+  try { sendSuccess(res, await hostsService.getHostPromotions(getHostScopeId(req))); }
+  catch (err) { next(err); }
+};
+
+export const createPromotion = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const promo = await hostsService.createPromotion(getHostScopeId(req), req.body);
+    sendSuccess(res, promo, 201, 'Promotion created');
+  } catch (err) { next(err); }
+};
